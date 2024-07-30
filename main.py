@@ -2,6 +2,7 @@ import requests
 import sqlite3
 import json
 import logging
+import os
 from datetime import datetime
 from database import init_db, insert_data, get_data
 from analysis import analyze_data
@@ -48,10 +49,12 @@ def main():
         # Generate report
         logging.info("Generating report")
         report = generate_report(analysis_results)
-        # print(report)
 
-        # Save report to file
-        report_filename = f"reports/{device_id}_{datetime.now().strftime('%Y%m%dT%H%M%S')}.txt"
+        # Save report as text file
+        output_dir = "reports"
+        if not os.path.exists(output_dir):
+            os.makedirs(output_dir)
+        report_filename = f"{output_dir}/{device_id}_{datetime.now().strftime('%Y%m%dT%H%M%S')}.txt"
         with open(report_filename, 'w') as report_file:
             report_file.write(report)
 
