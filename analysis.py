@@ -1,21 +1,44 @@
+import sqlite3
 from datetime import datetime
-import pandas as pd
-from database import get_data
+import logging
 
-def analyze_data(db_path, device_id):
-    data = get_data(db_path)
-    df = pd.DataFrame(data, columns=['id', 'timestamp', 'device_id', 'pm25', 'run_time'])
-    
-    # Filter by device_id
-    device_df = df[df['device_id'] == device_id].copy()
+def analyze_data(db_path, device_id, threshold) -> dict:
+    try:
+        with sqlite3.connect(db_path) as conn:
+            c = conn.cursor()
 
-    above_threshold = device_df[device_df['pm25'] > 30]['timestamp'].tolist()
-    
-    # Convert timestamp to datetime and extract date
-    device_df['date'] = pd.to_datetime(device_df['timestamp']).dt.date
+            # Fetch timestamps where PM2.5 is above the threshold
+            above_threshold_query = """
+                SELECT timestamp 
+                FROM pm25_data 
+                WHERE device_id = ? AND pm25 > ?
+            """
+            c.execute(above_threshold_query, (device_id, threshold))
+            above_threshold = [row[0] for row in c.fetchall()]
 
-    # Group by date to get daily stats
-    daily_stats = device_df.groupby('date')['pm25'].agg(['max', 'min', 'mean']).reset_index()
-    daily_stats.rename(columns={'max': 'max_pm25', 'min': 'min_pm25', 'mean': 'avg_pm25'}, inplace=True)
+            # Fetch daily statistics (max, min, avg) for each date
+            daily_stats_query = """
+                SELECT DATE(timestamp) as date, 
+                       MAX(pm25) as max_pm25, 
+                       MIN(pm25) as min_pm25, 
+                       AVG(pm25) as avg_pm25 
+                FROM pm25_data 
+                WHERE device_id = ? 
+                GROUP BY DATE(timestamp)
+                ORDER BY date ASC
+            """
+            c.execute(daily_stats_query, (device_id,))
+            daily_stats = []
+            for row in c.fetchall():
+                daily_stats.append({
+                    'date': row[0],
+                    'max_pm25': row[1],
+                    'min_pm25': row[2],
+                    'avg_pm25': row[3]
+                })
 
-    return {'above_threshold': above_threshold, 'daily_stats': daily_stats}
+        return {'above_threshold': above_threshold, 'daily_stats': daily_stats}
+
+    except sqlite3.Error as e:
+        logging.error(f"Database query error: {e}")
+        raise

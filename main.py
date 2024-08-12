@@ -1,42 +1,38 @@
-import requests
-import sqlite3
-import json
+import argparse
 import logging
 import os
 from datetime import datetime
-from database import init_db, insert_data, get_data
+from pm25api import fetch_data
+from database import init_db, insert_data
 from analysis import analyze_data
 from report import generate_report
 
 API_URL = "https://pm25.lass-net.org/API-1.0.0/device/{device_id}/history/"
 
-def fetch_data(device_id):
-    url = API_URL.format(device_id=device_id)
-    
-    # disable ssl warning
-    requests.packages.urllib3.disable_warnings()
-    
-    response = requests.get(url, verify=False)
-    if response.status_code == 200:
-        return response.json()
-    else:
-        raise Exception("Failed to fetch data from API")
-
 def main():
+    parser = argparse.ArgumentParser(description="PM2.5 Monitor Program")
+    parser.add_argument("-i", "--device_id", default="08BEAC028630", help="Device ID to fetch data for. (default: %(default)s)")
+    parser.add_argument("-t", "--threshold", default=30, help="PM2.5 danger threshold. (default: %(default)s)")
+    parser.add_argument("-d", "--database_path", default='pm25_data.db', help="Database name. (default: %(default)s)")
+    args = parser.parse_args()
+
     logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
     logging.info("Starting PM2.5 Monitor Program")
 
-    device_id = input("Enter device ID (press enter to use default device '08BEAC028630'): ") or "08BEAC028630"
-    db_path = "pm25_data.db"
+    device_id = args.device_id
+    threshold = args.threshold
+    db_path = args.database_path
+
+    # input validation
+    if not isinstance(threshold, (int, float)):
+        raise ValueError('Invalid threshold input')
+    if db_path[-3:] != '.db':
+        raise ValueError('Invalid database path')
 
     try:
-        # Initialize database
-        logging.info("Initializing database")
-        init_db(db_path)
-
         # Fetch data from API
         logging.info(f"Fetching data for device ID: {device_id}")
-        data = fetch_data(device_id)
+        data = fetch_data(API_URL, device_id)
 
         # Save data to database
         logging.info("Inserting data into database")
@@ -44,17 +40,17 @@ def main():
 
         # Analyze data
         logging.info("Analyzing data")
-        analysis_results = analyze_data(db_path, device_id)
+        analysis_results = analyze_data(db_path, device_id, threshold)
 
         # Generate report
         logging.info("Generating report")
         report = generate_report(analysis_results)
 
-        # Save report as text file
+        # Save report as text file 
         output_dir = "reports"
-        if not os.path.exists(output_dir):
-            os.makedirs(output_dir)
+        os.makedirs(output_dir, exist_ok=True)
         report_filename = f"{output_dir}/{device_id}_{datetime.now().strftime('%Y%m%dT%H%M%S')}.txt"
+
         with open(report_filename, 'w') as report_file:
             report_file.write(report)
 
