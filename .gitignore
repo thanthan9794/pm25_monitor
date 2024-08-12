@@ -177,3 +177,6 @@ pyrightconfig.json
 
 # Output reports for pm25_monitor project 
 reports/*.txt
+
+# Local database
+*.db
