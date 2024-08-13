@@ -19,10 +19,10 @@ This application monitors PM2.5 levels using data from the PM2.5 Open Data Porta
 Run the main script to fetch data, analyze it, and generate a report:
 
    ```sh
-python main.py
+python main.py [-h] [-i DEVICE_ID] [-t THRESHOLD] [-d DATABASE_PATH]
 ```
 
-Input: Device ID
+Sample Device ID: 08BEAC028630 (default), 08BEAC0286D4, 08BEAC02869E
 
 Output: Report containing the following information is saved in reports\
 - a list of times when the level when above the danger threshold
